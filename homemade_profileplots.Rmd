@@ -1,0 +1,213 @@
+---
+title: "Profile Plots"
+output:
+   html_document:
+      code_folding: hide
+      df_print: paged
+      highlights: pygments
+      number_sections: true
+      self_contained: true
+      theme: default
+      toc: true
+      toc_float:
+         collapsed: true
+         smooth_scroll: true
+---
+
+## Set-up
+
+Load necessary packages and define global options
+
+```{r setup, echo = FALSE, cache = FALSE}
+knitr::opts_chunk$set(dev = c('png', 'cairo_pdf'),
+                      fig.align = 'center', 
+                      fig.height = 5, 
+                      fig.width = 7,
+                      pdf.options(encoding = "ISOLatin9.enc"),
+                      fig.path='figures/',
+                      warning=FALSE, 
+                      message=FALSE,
+                      cache = FALSE,
+                      dev = c("png", "pdf"),
+                      error = TRUE,
+                      highlight = TRUE,
+                      prompt = FALSE,
+                      tidy = FALSE, echo=FALSE)
+```
+
+```{r load-libraries}
+# Load libraries
+library(fgsea)
+library(gridExtra)
+library(ggplot2)
+library(tidyverse)
+library(ggrepel)
+library(knitr)
+library(pheatmap)
+library(reshape2)
+library(ChIPpeakAnno)
+
+
+
+# Set ggplot2 default theme
+ggplot2::theme_set(theme_light(base_size = 14))
+
+sanitize_datatable = function(df, ...) {
+ # remove dashes which cause wrapping
+ DT::datatable(df, ..., rownames=gsub("-", "_", rownames(df)),
+                   colnames=gsub("-", "_", colnames(df)))
+}
+
+
+
+
+```
+
+## Goals
+
+This code is for visualizing open chromatin patterns across genomic regions (e.g. TSS) for specific genes. Input files are generated externally using tools like bedtools and deeptools. This script handles plotting those outputs with options to adjust window sizes and region types.
+
+
+
+```{bash, eval=F}
+## HERE ARE THE CLUSTER COMMANDS
+
+## make windowed bedfile. start by manually creating my_genes.bed with different regions that you want to plot downstream. -w indicates the window size, here 50
+
+bedtools makewindows -b my_genes.bed -w 50 > my_genes_50.bed
+
+
+## This uses deeptools to create counts for the windows for each sample. Use the deduplicated sorted files from nf-core these often have the suffix .mLb.clN.sorted.bam 
+
+multiBamSummary BED-file --BED my_genes_50.bed --bamfiles sample1_KO.mLb.clN.sorted.bam sample2_KO.mLb.clN.sorted.bam sample3_WT.mLb.clN.sorted.bam sample4_WT.mLb.clN.sorted.bam --outRawCounts readCounts_ready_50bp_mygenes.tab
+
+
+ 
+ 
+ 
+```
+
+
+
+## Load count matrices 
+```{r}
+
+## read in the deeptools output
+counts_50 <- read.table("/mydir/mydata/readCounts_ready_50bp_mygenes.tab", header=F)
+
+## rename columns for clarity
+colnames(counts_50) <- c("chr.", "start", "end",
+                         "sample1_KO", "sample2_KO", 
+                         "sample3_WT","sample4_WT")
+
+
+
+# Calculate midpoint of each window
+counts_50$mid <- (counts_50$start + counts_50$end)/2
+
+
+## normalize
+
+## We need to normalize to total mapped reads so that we are sure our patterns are real. Grab the total numbers of mapped reads for each sample. Assign the sample with the smallest number of reads as 1. Then for all other samples do lib_size / lib_size_smallest_reads to calculate the scaling factor manually. E.x. sample2_KO = 90167074/83881054
+
+## Library size factors
+
+#Sample	total reads	size factors
+#sample1_KO	83881054	1
+#sample2_KO	90167074	1.07494
+#sample3_WT	92938466	1.1080
+#sample4_WT	87034616	1.0377
+
+## Make a vector with the size factor
+scaling = c(1,1.074939688,1.107979235,1.037595641)
+
+##  Normalize counts using scaling factors
+counts_50_scaled <- counts_50 
+counts_50_scaled$sample1_KO <- counts_50$sample1_KO/scaling[1]
+counts_50_scaled$sample2_KO <- counts_50$sample2_KO/scaling[2]
+counts_50_scaled$sample3_WT <- counts_50$sample3_WT/scaling[3]
+counts_50_scaled$sample4_WT <- counts_50$sample4_WT/scaling[4]
+
+
+```
+
+# Plot genes
+
+For each gene we plot the smoothed pattern using geom_smooth to look at the overall effect. We can add lines for TSS end of coding region or enhancers. In this example green line indicates the TSS and red line indicates the end of the coding region. Enhancers are indicated with black lines
+
+
+
+### Prep the data for the gene of interest
+```{r}
+
+# Subset region of interest (edit coordinates per gene)
+
+counts_50_GeneA <- subset(counts_50_scaled, 
+                          chr. == "chr11" & 
+                          start > 46447208 & 
+                          end < 46481755)
+
+# Melt dataframe for plotting individual samples
+counts_50_GeneA_melt <- melt(counts_50_GeneA, id = c("start", "end", "chr.", "mid"))
+
+# Compute group averages
+counts_50_GeneA$KO <- (counts_50_GeneA$sample1_KO + counts_50_GeneA$sample2_KO) / 2
+counts_50_GeneA$WT <- (counts_50_GeneA$sample3_WT + counts_50_GeneA$sample4_WT) / 2
+
+# Subset averaged columns for plotting
+counts_50_GeneA_avg <- counts_50_GeneA[, c("start", "end", "chr.", "mid", "KO", "WT")]
+
+# Melt for plotting averages
+counts_50_GeneA_melt_avg <- melt(counts_50_GeneA_avg, id = c("start", "end", "chr.", "mid"))
+
+```
+
+## Profile Plot - each sample separately
+
+```{r}
+ggplot(counts_50_GeneA_melt, aes(x=mid,y=value, color=variable))  + geom_smooth(se = FALSE) + ## general graph
+  geom_vline(xintercept=46454839) + ## Enhancer1
+  geom_vline(xintercept=46447839) +  ## Enhancer2
+  geom_vline(xintercept=46448253) + ## Enhancer3
+  ggtitle("GeneA - 50 bp windows") + xlab("Position") + ylab("Read Density") + ## Add labels
+  scale_color_manual(values = c("pink","pink1","grey75","grey85")) + ## give specific colors
+  geom_vline(xintercept=46455001, color="darkgreen") + ## TSS
+  geom_vline(xintercept=46479446, color="red") + ## End of CDS
+
+
+
+
+```
+
+## Profile Plot averaged across replicates
+
+```{r}
+ggplot(counts_50_GeneA_melt_avg, aes(x=mid,y=value, color=variable))  + geom_smooth(se = FALSE) + ## general graph
+  geom_vline(xintercept=46454839) + ## Enhancer1
+  geom_vline(xintercept=46447839) +  ## Enhancer2
+  geom_vline(xintercept=46448253) + ## Enhancer3
+  ggtitle("GeneA Averages - 50 bp windows") + xlab("Position") + ylab("Read Density") + ## Add labels
+  scale_color_manual(values = c("pink","grey75")) + ## give specific colors
+  geom_vline(xintercept=46455001, color="darkgreen") + ## TSS
+  geom_vline(xintercept=46479446, color="red") + ## End of CDS
+
+
+
+```
+
+
+```{r, eval=F}
+
+## Rinse and repeat for as many genes as you want by copying and pasting the above 3 sections and changing the gene coordinates.
+
+```
+
+
+
+# R session
+
+List and version of tools used for the report.
+
+```{r}
+sessionInfo()
+```

@@ -36,7 +36,8 @@ Additional useful info:
 
 ### Quality assessment
 
-![](https://img.shields.io/badge/status-draft-grey) [chipseq/01_quality_assessment/QC.Rmd](chipseq/01_quality_assessment/QC.Rmd)
+![](https://img.shields.io/badge/status-draft-grey) [chipseq/01_quality_assessment/QC.Rmd](chipseq/01_quality_assessment/QC.Rmd) is a template for QC metrics. It includes basic read-level statistics, peak quality information, sample correlation analysis, and PCA that it produces using the above samplesheet and output from the nf-core pipeline. Use `params_qc.R` to provide the required input files. 
+
 
 ### Differential expression
 
@@ -44,3 +45,11 @@ Additional useful info:
 
 On the `YAML` header file of the `Rmd` you can specify some parameters or just set them up in the second chunk of code of the template. 
 
+On the YAML header file of the Rmd you can specify some parameters including the conditions to be compared, the genome used, and the desired output file names. This template has examples of:
+* calculating a peak counts matrix
+* PCA
+* differential binding analysis
+* peak annotation
+* functional analysis (coming soon)
+
+This template writes to CSV a log2 normalized counts matrix of peaks x samples as well as the annotated significant results of the differential binding analysis. 

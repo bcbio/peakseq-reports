@@ -15,7 +15,6 @@ Templates with ![](https://img.shields.io/badge/status-draft-grey) revision indi
 These templates assume that the raw data has been processed by 
 
 - [nf-core/chipseq](https://nf-co.re/chipseq/2.1.0/docs/usage)
-- EPIC methylation array
 
 ## Quick Start
 
@@ -23,7 +22,6 @@ These templates assume that the raw data has been processed by
 
 ```
 source(install_depedencies.R)
-rmarkdown::render("QC.Rmd", quiet = TRUE
 ```
 
 ## Downstream analysis

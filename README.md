@@ -17,10 +17,6 @@ These templates assume that the raw data has been processed by
 - [nf-core/chipseq](https://nf-co.re/chipseq/2.1.0/docs/usage)
 - EPIC methylation array
 
-## EPIC methylation arrays
-
-Work in progress
-
 ## Quick Start
 
 ### With Rstudio

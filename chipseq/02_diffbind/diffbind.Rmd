@@ -109,7 +109,7 @@ if (params$species == 'mouse'){
   txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
   anno_db <- 'org.Mm.eg.db'
   library(org.Mm.eg.db)
-} else if (params$species == human){
+} else if (params$species == "human"){
   library(TxDb.Hsapiens.UCSC.hg38.knownGene)
   txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
   anno_db <- 'org.Hs.eg.db'
